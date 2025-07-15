@@ -52,10 +52,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       setIsLoading(true);
       try {
-        // Assume apiService.validateToken usa o token armazenado internamente
+        apiService.setAuthHeader(storedToken);
         const response = await apiService.validateToken();
-        if (response.success && response.user) {
-          setUser(response.user);
+        if (response.success && response.data?.user) {
+          setUser(response.data.user);
           console.log('✅ AuthContext: Token válido');
         } else {
           setUser(null);
@@ -78,14 +78,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setError(null);
     try {
       console.log('🔐 AuthContext: Iniciando login...');
-      const res = await apiService.login({ email, password } as LoginRequest) as AuthResponse;
+      const res = (await apiService.login({ email, password } as LoginRequest)) as AuthResponse;
       console.log('📦 AuthContext: Resposta do login:', res);
 
-      if (!res.success || !res.data.tokens.accessToken) {
+      if (!res.success || !res.data?.tokens.accessToken) {
         throw new Error(res.message || 'Falha no login');
       }
 
-      // apiService.login já persiste o token e configura headers
+      // Persiste tokens e configura header
+      localStorage.setItem('accessToken', res.data.tokens.accessToken);
+      localStorage.setItem('refreshToken', res.data.tokens.refreshToken);
+      apiService.setAuthHeader(res.data.tokens.accessToken);
+
       setUser(res.data.user);
       toast.success('🎉 Login realizado com sucesso!');
       console.log('✅ AuthContext: Login bem-sucedido');
@@ -106,17 +110,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsLoading(true);
     setError(null);
     try {
-      const res = await apiService.register({ name, email, password } as RegisterRequest) as AuthResponse;
-      if (!res.success || !res.data.tokens.accessToken) {
+      console.log('📝 AuthContext: Iniciando registro...');
+      const res = (await apiService.register({ name, email, password } as RegisterRequest)) as AuthResponse;
+      console.log('📦 AuthContext: Resposta do registro:', res);
+
+      if (!res.success || !res.data?.tokens.accessToken) {
         throw new Error(res.message || 'Falha no registro');
       }
 
-      // apiService.register já persiste o token e configura headers
+      // Persiste tokens e configura header
+      localStorage.setItem('accessToken', res.data.tokens.accessToken);
+      localStorage.setItem('refreshToken', res.data.tokens.refreshToken);
+      apiService.setAuthHeader(res.data.tokens.accessToken);
+
       setUser(res.data.user);
       toast.success('🎉 Registro realizado com sucesso!');
       console.log('✅ AuthContext: Registro bem-sucedido');
     } catch (err: any) {
       console.error('❌ AuthContext: Erro no registro:', err);
+      setUser(null);
       const msg = err.response?.data?.message || err.message || 'Erro ao registrar';
       setError(msg);
       apiService.clearAuthData();

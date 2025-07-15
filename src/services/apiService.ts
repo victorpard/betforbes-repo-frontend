@@ -14,16 +14,20 @@ interface RegisterRequest {
 
 interface AuthResponse {
   success: boolean;
-  user?: {
-    id: string;
-    name: string;
-    email: string;
-    avatar?: string;
-    isPremium: boolean;
-    isAdmin: boolean;
+  data?: {
+    user: {
+      id: string;
+      name: string;
+      email: string;
+      avatar?: string;
+      isPremium: boolean;
+      isAdmin: boolean;
+    };
+    tokens: {
+      accessToken: string;
+      refreshToken: string;
+    };
   };
-  token?: string;
-  refreshToken?: string;
   message?: string;
 }
 
@@ -33,11 +37,16 @@ interface ApiError {
 }
 
 class ApiService {
+  // Headers padrão de todas as requisições
+  private defaultHeaders: HeadersInit = {
+    'Content-Type': 'application/json'
+  };
+
   private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('betforbes_token');
+    const token = localStorage.getItem('accessToken');
     return {
-      'Content-Type': 'application/json',
-      ...(token && { 'Authorization': `Bearer ${token}` }),
+      ...this.defaultHeaders,
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
     };
   }
 
@@ -52,162 +61,121 @@ class ApiService {
     return response.json();
   }
 
-  // Login com backend real
+  /** Define o header Authorization para futuras requisições */
+  setAuthHeader(token: string) {
+    this.defaultHeaders = {
+      ...this.defaultHeaders,
+      'Authorization': `Bearer ${token}`
+    };
+  }
+
+  /** Limpa headers de auth e storage */
+  clearAuthData(): void {
+    this.defaultHeaders = {
+      'Content-Type': 'application/json'
+    };
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+  }
+
+  // Login
   async login(credentials: LoginRequest): Promise<AuthResponse> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: 'POST',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(credentials),
-      });
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(credentials),
+    });
+    const data = await this.handleResponse<AuthResponse>(response);
 
-      const data = await this.handleResponse<AuthResponse>(response);
-      
-      // Salvar token se login bem-sucedido
-      if (data.success && data.token) {
-        localStorage.setItem('betforbes_token', data.token);
-        if (data.refreshToken) {
-          localStorage.setItem('betforbes_refresh_token', data.refreshToken);
-        }
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Erro no login:', error);
-      throw error;
+    if (data.success && data.data?.tokens.accessToken) {
+      localStorage.setItem('accessToken', data.data.tokens.accessToken);
+      localStorage.setItem('refreshToken', data.data.tokens.refreshToken);
+      this.setAuthHeader(data.data.tokens.accessToken);
     }
+
+    return data;
   }
 
-  // Registro com backend real
+  // Registro
   async register(userData: RegisterRequest): Promise<AuthResponse> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/auth/register`, {
-        method: 'POST',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(userData),
-      });
+    const response = await fetch(`${API_BASE_URL}/auth/register`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(userData),
+    });
+    const data = await this.handleResponse<AuthResponse>(response);
 
-      const data = await this.handleResponse<AuthResponse>(response);
-      
-      // Salvar token se registro bem-sucedido
-      if (data.success && data.token) {
-        localStorage.setItem('betforbes_token', data.token);
-        if (data.refreshToken) {
-          localStorage.setItem('betforbes_refresh_token', data.refreshToken);
-        }
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Erro no registro:', error);
-      throw error;
+    if (data.success && data.data?.tokens.accessToken) {
+      localStorage.setItem('accessToken', data.data.tokens.accessToken);
+      localStorage.setItem('refreshToken', data.data.tokens.refreshToken);
+      this.setAuthHeader(data.data.tokens.accessToken);
     }
+
+    return data;
   }
 
-  // Validar token com backend
+  // Validar token
   async validateToken(): Promise<AuthResponse> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/auth/validate`, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
-
-      return this.handleResponse<AuthResponse>(response);
-    } catch (error) {
-      console.error('Erro na validação do token:', error);
-      // Se token inválido, limpar storage
-      this.clearAuthData();
-      throw error;
-    }
+    const response = await fetch(`${API_BASE_URL}/auth/validate`, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    });
+    return this.handleResponse<AuthResponse>(response);
   }
 
   // Refresh token
   async refreshToken(): Promise<AuthResponse> {
-    try {
-      const refreshToken = localStorage.getItem('betforbes_refresh_token');
-      if (!refreshToken) {
-        throw { message: 'Refresh token não encontrado', status: 401 } as ApiError;
-      }
-
-      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ refreshToken }),
-      });
-
-      const data = await this.handleResponse<AuthResponse>(response);
-      
-      // Atualizar tokens
-      if (data.success && data.token) {
-        localStorage.setItem('betforbes_token', data.token);
-        if (data.refreshToken) {
-          localStorage.setItem('betforbes_refresh_token', data.refreshToken);
-        }
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Erro no refresh token:', error);
-      this.clearAuthData();
-      throw error;
+    const refreshToken = localStorage.getItem('refreshToken');
+    if (!refreshToken) {
+      throw { message: 'Refresh token não encontrado', status: 401 } as ApiError;
     }
+
+    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+    const data = await this.handleResponse<AuthResponse>(response);
+
+    if (data.success && data.data?.tokens.accessToken) {
+      localStorage.setItem('accessToken', data.data.tokens.accessToken);
+      localStorage.setItem('refreshToken', data.data.tokens.refreshToken);
+      this.setAuthHeader(data.data.tokens.accessToken);
+    }
+
+    return data;
   }
 
   // Logout
   async logout(): Promise<void> {
-    try {
-      await fetch(`${API_BASE_URL}/auth/logout`, {
-        method: 'POST',
-        headers: this.getAuthHeaders(),
-      });
-    } catch (error) {
-      console.error('Erro no logout:', error);
-    } finally {
-      this.clearAuthData();
-    }
+    await fetch(`${API_BASE_URL}/auth/logout`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+    }).catch(console.error)
+      .finally(() => this.clearAuthData());
   }
 
-  // Limpar dados de autenticação
-  clearAuthData(): void {
-    localStorage.removeItem('betforbes_token');
-    localStorage.removeItem('betforbes_refresh_token');
-    localStorage.removeItem('betforbes_auth');
-    sessionStorage.clear();
-  }
-
-  // Verificar se tem token válido
+  // Verificar token
   hasValidToken(): boolean {
-    const token = localStorage.getItem('betforbes_token');
+    const token = localStorage.getItem('accessToken');
     if (!token) return false;
-
     try {
-      // Decodificar JWT para verificar expiração
       const payload = JSON.parse(atob(token.split('.')[1]));
-      const now = Date.now() / 1000;
-      return payload.exp > now;
+      return payload.exp > Date.now() / 1000;
     } catch {
       return false;
     }
   }
 
-  // Obter dados do usuário do backend
+  // Perfil
   async getUserProfile(): Promise<AuthResponse> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/user/profile`, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
-
-      return this.handleResponse<AuthResponse>(response);
-    } catch (error) {
-      console.error('Erro ao obter perfil do usuário:', error);
-      throw error;
-    }
+    const response = await fetch(`${API_BASE_URL}/user/profile`, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    });
+    return this.handleResponse<AuthResponse>(response);
   }
 }
 
 export const apiService = new ApiService();
 export type { LoginRequest, RegisterRequest, AuthResponse, ApiError };
-
