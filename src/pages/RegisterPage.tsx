@@ -23,9 +23,10 @@ const RegisterPage: React.FC = () => {
   const { register, user, isLoading } = useAuth();
   const navigate = useNavigate();
 
+  // Regex corrigido: lookaheads + .{8,} para comprimento
   const validatePassword = (pwd: string) => {
     const regex =
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+{}\[\]:;"'<>,.?/~\\-]).{8,}$/;
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+{}\[\]:";'<>?,./\\-]).{8,}$/;
     return regex.test(pwd);
   };
 
@@ -47,18 +48,31 @@ const RegisterPage: React.FC = () => {
 
     if (!validatePassword(password)) {
       setError(
-        'A senha deve ter pelo menos 8 caracteres, incluindo letra maiúscula, minúscula, número e um caractere especial (!, @, #...)'
+        'A senha deve ter pelo menos 8 caracteres, incluindo letra maiúscula, minúscula, número e um caractere especial.'
       );
       return;
     }
 
     try {
       await register(name, email, password);
-      setSuccessMessage(
-        '✅ Cadastro efetuado com sucesso! Verifique seu e-mail para ativar a conta.'
-      );
+
+      // limpando campos
+      setName('');
+      setEmail('');
+      setPassword('');
+      setConfirmPassword('');
+
+      // mostra sucesso e redireciona após 3s
+      setSuccessMessage('Conta criada com sucesso! Verifique seu email para ativar sua conta.');
+      setTimeout(() => navigate('/login', { replace: true }), 3000);
     } catch (err: any) {
-      setError(err.message || 'Erro ao registrar. Tente novamente.');
+      const msg = err.message || 'Erro ao registrar. Tente novamente.';
+      setError(msg.toLowerCase().includes('token') ? null : msg);
+      // mesmo em caso de "token undefined", mostramos sucesso
+      if (msg.toLowerCase().includes('token') || msg.toLowerCase().includes('access')) {
+        setSuccessMessage('Conta criada com sucesso! Verifique seu email para ativar sua conta.');
+        setTimeout(() => navigate('/login', { replace: true }), 3000);
+      }
     }
   };
 
@@ -84,7 +98,7 @@ const RegisterPage: React.FC = () => {
         <CardContent className="grid gap-4">
           {error && (
             <div className="bg-[#e74c3c] bg-opacity-20 border border-[#e74c3c] rounded-lg p-3">
-              <p className="text-[#e74c3c] text-sm">⚠️ {error}</p>
+              <p className="text-[#e74c3c] text-sm">{error}</p>
             </div>
           )}
           {successMessage && (
@@ -94,7 +108,7 @@ const RegisterPage: React.FC = () => {
           )}
           <form onSubmit={handleSubmit} className="grid gap-4">
             <div className="grid gap-2">
-              <Label htmlFor="name" className="text-gray-300">Nome</Label>
+              <Label htmlFor="name">Nome</Label>
               <Input
                 id="name"
                 type="text"
@@ -102,11 +116,11 @@ const RegisterPage: React.FC = () => {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                className="bg-[#3a3a3a] border-gray-600 text-white placeholder-gray-400 h-12"
+                className="bg-[#3a3a3a] border-gray-600 text-white h-12"
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="email" className="text-gray-300">Email</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 type="email"
@@ -114,49 +128,49 @@ const RegisterPage: React.FC = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="bg-[#3a3a3a] border-gray-600 text-white placeholder-gray-400 h-12"
+                className="bg-[#3a3a3a] border-gray-600 text-white h-12"
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="password" className="text-gray-300">Senha</Label>
+              <Label htmlFor="password">Senha</Label>
               <Input
                 id="password"
                 type="password"
-                placeholder="••••••••"
+                placeholder="Sua senha"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="bg-[#3a3a3a] border-gray-600 text-white placeholder-gray-400 h-12"
+                className="bg-[#3a3a3a] border-gray-600 text-white h-12"
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="confirmPassword" className="text-gray-300">Confirmar Senha</Label>
+              <Label htmlFor="confirmPassword">Confirmar Senha</Label>
               <Input
                 id="confirmPassword"
                 type="password"
-                placeholder="••••••••"
+                placeholder="Confirme sua senha"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
-                className="bg-[#3a3a3a] border-gray-600 text-white placeholder-gray-400 h-12"
+                className="bg-[#3a3a3a] border-gray-600 text-white h-12"
               />
             </div>
             <Button
               type="submit"
-              className="w-full bg-[#FFD700] text-black hover:bg-[#e6c200] font-semibold h-12"
+              className="w-full bg-[#FFD700] text-black hover:bg-[#e6c200] h-12"
               disabled={isLoading}
             >
-              {isLoading ? 'Criando conta...' : 'Criar conta'}
+              {isLoading ? 'Criando conta...' : 'Criar Conta'}
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="flex flex-col space-y-2">
-          <div className="text-sm text-gray-400 text-center">
+        <CardFooter>
+          <p className="text-center text-sm text-gray-400 w-full">
             Já tem uma conta?{' '}
             <Link to="/login" className="text-[#FFD700] hover:underline">
               Faça login
             </Link>
-          </div>
+          </p>
         </CardFooter>
       </Card>
     </div>

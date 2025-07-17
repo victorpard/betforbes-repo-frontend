@@ -1,25 +1,43 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { apiService, AuthResponse, LoginRequest, RegisterRequest } from '../services/apiService';
-import { toast } from 'react-toastify';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode
+} from 'react'
+import axios from 'axios'
+import {
+  apiService,
+  AuthResponse,
+  LoginRequest,
+  RegisterRequest
+} from '../services/apiService'
+import { toast } from 'react-toastify'
+
+/**
+ * Configura baseURL e credenciais do axios
+ */
+axios.defaults.baseURL = import.meta.env.VITE_API_URL || '/'    // ex: "/api"
+axios.defaults.withCredentials = true                           // se usar cookies/tokens
 
 interface User {
-  id: string;
-  name: string;
-  email: string;
-  avatar?: string;
-  isPremium: boolean;
-  isAdmin: boolean;
+  id: string
+  name: string
+  email: string
+  avatar?: string
+  isPremium: boolean
+  isAdmin: boolean
 }
 
 interface AuthContextType {
-  user: User | null;
-  isLoading: boolean;
-  isAuthenticated: boolean;
-  error: string | null;
-  login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
-  clearError: () => void;
+  user: User | null
+  isLoading: boolean
+  isAuthenticated: boolean
+  error: string | null
+  login: (email: string, password: string) => Promise<void>
+  register: (name: string, email: string, password: string) => Promise<void>
+  logout: () => Promise<void>
+  clearError: () => void
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -30,129 +48,136 @@ const AuthContext = createContext<AuthContextType>({
   login: async () => {},
   register: async () => {},
   logout: async () => {},
-  clearError: () => {},
-});
+  clearError: () => {}
+})
 
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({
+  children
+}) => {
+  const [user, setUser] = useState<User | null>(null)
+  const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const isAuthenticated = !!user;
+  const isAuthenticated = !!user
 
-  // Reidrata e valida o token ao montar
+  // 1) Ao montar, tenta reidratar e validar token
   useEffect(() => {
     const initializeAuth = async () => {
-      const storedToken = localStorage.getItem('accessToken');
-      if (!storedToken) {
-        apiService.clearAuthData();
-        setIsLoading(false);
-        return;
+      const token = localStorage.getItem('accessToken')
+      if (!token) {
+        apiService.clearAuthData()
+        setIsLoading(false)
+        return
       }
 
-      setIsLoading(true);
+      setIsLoading(true)
+      apiService.setAuthHeader(token)
       try {
-        apiService.setAuthHeader(storedToken);
-        const response = await apiService.validateToken();
-        if (response.success && response.data?.user) {
-          setUser(response.data.user);
-          console.log('✅ AuthContext: Token válido');
+        const res = await apiService.validateToken()
+        if (res.success && res.data?.user) {
+          setUser(res.data.user)
         } else {
-          setUser(null);
-          apiService.clearAuthData();
-          console.log('🔴 AuthContext: Token inválido');
+          apiService.clearAuthData()
+          setUser(null)
         }
-      } catch (err) {
-        console.error('❌ AuthContext: Erro na validação do token', err);
-        setUser(null);
-        apiService.clearAuthData();
+      } catch {
+        apiService.clearAuthData()
+        setUser(null)
       } finally {
-        setIsLoading(false);
+        setIsLoading(false)
       }
-    };
-    initializeAuth();
-  }, []);
+    }
 
-  const login = async (email: string, password: string): Promise<void> => {
-    setIsLoading(true);
-    setError(null);
+    initializeAuth()
+  }, [])
+
+  // 2) Login: grava token, seta user e context
+  const login = async (
+    email: string,
+    password: string
+  ): Promise<void> => {
+    setIsLoading(true)
+    setError(null)
+
     try {
-      console.log('🔐 AuthContext: Iniciando login...');
-      const res = (await apiService.login({ email, password } as LoginRequest)) as AuthResponse;
-      console.log('📦 AuthContext: Resposta do login:', res);
+      const res = (await apiService.login({
+        email,
+        password
+      } as LoginRequest)) as AuthResponse
 
       if (!res.success || !res.data?.tokens.accessToken) {
-        throw new Error(res.message || 'Falha no login');
+        throw new Error(res.message || 'Falha no login')
       }
 
-      // Persiste tokens e configura header
-      localStorage.setItem('accessToken', res.data.tokens.accessToken);
-      localStorage.setItem('refreshToken', res.data.tokens.refreshToken);
-      apiService.setAuthHeader(res.data.tokens.accessToken);
+      localStorage.setItem('accessToken', res.data.tokens.accessToken)
+      localStorage.setItem('refreshToken', res.data.tokens.refreshToken)
+      apiService.setAuthHeader(res.data.tokens.accessToken)
 
-      setUser(res.data.user);
-      toast.success('🎉 Login realizado com sucesso!');
-      console.log('✅ AuthContext: Login bem-sucedido');
+      setUser(res.data.user)
+      toast.success('🎉 Login realizado com sucesso!')
     } catch (err: any) {
-      console.error('❌ AuthContext: Erro no login:', err);
-      setUser(null);
-      const msg = err.response?.data?.message || err.message || 'Erro ao fazer login';
-      setError(msg);
-      apiService.clearAuthData();
-      toast.error(msg);
-      throw err;
+      setUser(null)
+      const msg = err.response?.data?.message || err.message
+      setError(msg)
+      apiService.clearAuthData()
+      toast.error(msg)
+      throw err
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
-  const register = async (name: string, email: string, password: string): Promise<void> => {
-    setIsLoading(true);
-    setError(null);
+  // 3) Registro: dispara toast
+  const register = async (
+    name: string,
+    email: string,
+    password: string
+  ): Promise<void> => {
+    setIsLoading(true)
+    setError(null)
+
     try {
-      console.log('📝 AuthContext: Iniciando registro...');
-      const res = (await apiService.register({ name, email, password } as RegisterRequest)) as AuthResponse;
-      console.log('📦 AuthContext: Resposta do registro:', res);
+      const res = (await apiService.register({
+        name,
+        email,
+        password
+      } as RegisterRequest)) as AuthResponse
 
-      if (!res.success || !res.data?.tokens.accessToken) {
-        throw new Error(res.message || 'Falha no registro');
+      if (!res.success) {
+        throw new Error(res.message || 'Falha no registro')
       }
 
-      // Persiste tokens e configura header
-      localStorage.setItem('accessToken', res.data.tokens.accessToken);
-      localStorage.setItem('refreshToken', res.data.tokens.refreshToken);
-      apiService.setAuthHeader(res.data.tokens.accessToken);
-
-      setUser(res.data.user);
-      toast.success('🎉 Registro realizado com sucesso!');
-      console.log('✅ AuthContext: Registro bem-sucedido');
+      toast.success(
+        '🎉 Registro realizado! Verifique seu e‑mail para ativar a conta.'
+      )
     } catch (err: any) {
-      console.error('❌ AuthContext: Erro no registro:', err);
-      setUser(null);
-      const msg = err.response?.data?.message || err.message || 'Erro ao registrar';
-      setError(msg);
-      apiService.clearAuthData();
-      toast.error(msg);
-      throw err;
+      setUser(null)
+      const msg = err.response?.data?.message || err.message
+      setError(msg)
+      apiService.clearAuthData()
+      toast.error(msg)
+      throw err
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
+  // 4) Logout: limpa local e context
   const logout = async (): Promise<void> => {
+    setIsLoading(true)
     try {
-      console.log('🔒 AuthContext: Logout iniciado');
-      await apiService.logout();
-    } catch (err) {
-      console.error('❌ AuthContext: Erro no logout', err);
+      await apiService.logout()
+    } catch {
+      /* mesmo com erro, limpa */
     } finally {
-      setUser(null);
-      apiService.clearAuthData();
-      toast.info('Você saiu da conta.');
+      apiService.clearAuthData()
+      setUser(null)
+      setIsLoading(false)
+      toast.info('🚪 Você saiu da conta.')
     }
-  };
+  }
 
-  const clearError = () => setError(null);
+  const clearError = () => setError(null)
 
   return (
     <AuthContext.Provider
@@ -164,16 +189,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         login,
         register,
         logout,
-        clearError,
+        clearError
       }}
     >
       {children}
     </AuthContext.Provider>
-  );
-};
+  )
+}
 
 export const useAuth = (): AuthContextType => {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth deve ser usado dentro de um AuthProvider');
-  return context;
-};
+  const context = useContext(AuthContext)
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider')
+  }
+  return context
+}

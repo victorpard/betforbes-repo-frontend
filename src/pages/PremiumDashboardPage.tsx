@@ -6,72 +6,59 @@ import PremiumActionButtons from '../components/PremiumActionButtons';
 import InviteFriendsModal from '../components/InviteFriendsModal';
 import DepositModal from '../components/modals/DepositModal';
 import WithdrawModal from '../components/modals/WithdrawModal';
+import { useAuth } from '../contexts/AuthContext'; // 1. Importa o hook de autenticação
+import { useNavigate } from 'react-router-dom';
 
 const PremiumDashboardPage: React.FC = () => {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
 
-  const handleDeposit = () => {
-    setShowDepositModal(true);
-  };
+  const { user } = useAuth(); // 2. Pega os dados do usuário logado
+  const navigate = useNavigate();
 
-  const handleWithdraw = () => {
-    setShowWithdrawModal(true);
-  };
+  // Funções para abrir os modais
+  const handleDeposit = () => setShowDepositModal(true);
+  const handleWithdraw = () => setShowWithdrawModal(true);
+  const handleInviteFriends = () => setShowInviteModal(true);
 
-  const handleInviteFriends = () => {
-    setShowInviteModal(true);
+  // Formata os números para o padrão brasileiro
+  const formatCurrency = (value: number | undefined) => {
+    if (value === undefined) return 'R$ 0,00';
+    return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
 
   return (
     <div className="min-h-screen bg-[#1e1e1e] text-white pb-20">
-      {/* Header Premium */}
-      <PremiumHeader 
-        userName="Usuário"
-        notificationCount={3}
+      <PremiumHeader
+        userName={user?.name || 'Usuário'}
+        notificationCount={0}
       />
 
-      {/* Conteúdo principal */}
       <main className="flex-grow">
-        {/* Saldo e P&L */}
-        <PremiumBalanceCard 
-          balance="R$ 12.700,00"
-          pnl="+R$ 2.150,00"
-          isPositivePnl={true}
+        {/* 3. Usa os dados reais do usuário */}
+        <PremiumBalanceCard
+          balance={formatCurrency(user?.balance)}
+          pnl={formatCurrency(user?.pnl)}
+          isPositivePnl={(user?.pnl ?? 0) >= 0}
           onDeposit={handleDeposit}
           onWithdraw={handleWithdraw}
         />
 
-        {/* Cards de Resumo */}
-        <StatsCards 
-          totalBet="R$ 8.500,00"
-          totalWins={12}
-          winRate={75.5}
+        <StatsCards
+          totalBet={formatCurrency(user?.totalBet)}
+          totalWins={user?.totalWins ?? 0}
+          winRate={user?.winRate ?? 0}
         />
 
-        {/* Ações Rápidas */}
-        <PremiumActionButtons 
+        <PremiumActionButtons
           onInviteFriends={handleInviteFriends}
         />
       </main>
 
-      {/* Modais */}
-      <InviteFriendsModal 
-        isOpen={showInviteModal}
-        onClose={() => setShowInviteModal(false)}
-      />
-
-      <DepositModal
-        isOpen={showDepositModal}
-        onClose={() => setShowDepositModal(false)}
-      />
-
-      <WithdrawModal
-        isOpen={showWithdrawModal}
-        onClose={() => setShowWithdrawModal(false)}
-        availableBalance="R$ 12.700,00"
-      />
+      <InviteFriendsModal isOpen={showInviteModal} onClose={() => setShowInviteModal(false)} />
+      <DepositModal isOpen={showDepositModal} onClose={() => setShowDepositModal(false)} />
+      <WithdrawModal isOpen={showWithdrawModal} onClose={() => setShowWithdrawModal(false)} availableBalance={formatCurrency(user?.balance)} />
     </div>
   );
 };

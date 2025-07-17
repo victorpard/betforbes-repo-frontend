@@ -1,4 +1,4 @@
-import React from 'react';
+console.log('🔥 App inicializando em', window.location.pathname);import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { RouterProvider } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
@@ -16,7 +16,8 @@ if (rootElement) {
   root.render(
     <React.StrictMode>
       <AuthProvider> { /* AuthProvider wraps the entire application */ }
-        <RouterProvider 
+        console.log('🔥 [App] carregando rota', window.location.pathname);
+          <RouterProvider 
           router={router} 
           future={{
             v7_startTransition: true,
