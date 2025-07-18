@@ -1,0 +1,66 @@
+name: CI Smoke Tests
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - '.github/workflows/**'
+      - 'vite.config.ts'
+      - 'package.json'
+      - 'tsconfig.json'
+
+jobs:
+  build-frontend:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      - name: Install & Build Frontend
+        working-directory: ./betforbes-repo-frontend
+        run: |
+          npm ci
+          npm run build
+
+  build-backend-and-smoke:
+    name: Build Backend + Smoke Tests
+    runs-on: ubuntu-latest
+    needs: build-frontend
+    services:
+      backend:
+        image: node:18
+        options: >-
+          --entrypoint "bash -lc"
+          "cd betforbes-backend && npm ci && npm run build && node -r tsconfig-paths/register dist/index.js"
+        ports:
+          - 3001:3001
+    steps:
+      - uses: actions/checkout@v3
+      - name: Wait for backend to be healthy
+        run: |
+          for i in {1..12}; do
+            if curl --silent http://localhost:3001/health | grep -q '"status":"OK"'; then
+              echo "Backend is up"; break
+            fi
+            echo "Waiting for backend..."
+            sleep 5
+          done
+      - name: Smoke Test – Register
+        run: |
+          RESPONSE=$(curl --silent -X POST http://localhost:3001/api/auth/register \
+            -H "Content-Type: application/json" \
+            -d '{"name":"CI Test","email":"ci-test+${{ github.run_id }}@example.com","password":"Abcd1234","confirmPassword":"Abcd1234"}')
+          echo "Response: $RESPONSE"
+          echo "$RESPONSE" | jq '.success == true'
+      - name: Smoke Test – Login
+        run: |
+          # extrai email que acabamos de registrar
+          EMAIL=$(echo $RESPONSE | jq -r '.data.user.email')
+          RESPONSE2=$(curl --silent -X POST http://localhost:3001/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d "{\"email\":\"$EMAIL\",\"password\":\"Abcd1234\"}")
+          echo "Response: $RESPONSE2"
+          echo "$RESPONSE2" | jq '.success == true'
