@@ -1,31 +1,23 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import { RouterProvider } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
-import router from './router'; // Import the configured router
-import './index.css'; // Global styles
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import { RouterProvider } from 'react-router-dom'
+import { AuthProvider } from './contexts/AuthContext'
+import router from './router'
+import './index.css'
 
-// Get the root element
-const rootElement = document.getElementById('root');
+// Debug: ponto de entrada
+console.log('🚀 BetForbes App: ponto de entrada atingido')
 
-if (rootElement) {
-  // Create the root
-  const root = ReactDOM.createRoot(rootElement);
+const rootElement = document.getElementById('root')
 
-  // Render the application
-  root.render(
+if (!rootElement) {
+  console.error('Failed to find the root element')
+} else {
+  ReactDOM.createRoot(rootElement).render(
     <React.StrictMode>
-      <AuthProvider> { /* AuthProvider wraps the entire application */ }
-        <RouterProvider 
-          router={router} 
-          future={{
-            v7_startTransition: true,
-          }}
-        /> { /* RouterProvider uses the configured router */ }
+      <AuthProvider>
+        <RouterProvider router={router} />
       </AuthProvider>
     </React.StrictMode>
-  );
-} else {
-  console.error('Failed to find the root element');
+  )
 }
-

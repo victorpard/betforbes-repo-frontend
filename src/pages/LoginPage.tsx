@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import React, { useState, useEffect } from 'react'
+import { useNavigate, Link, useLocation } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import {
   Card,
   CardContent,
@@ -10,49 +10,44 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
+} from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
 
 const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const { login, user, isLoading } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const { login, user, isLoading } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
 
+  // redireciona se já logado
   useEffect(() => {
     if (!isLoading && user) {
-      const from = (location.state as any)?.from?.pathname || '/dashboard';
-      navigate(from, { replace: true });
+      const from = (location.state as any)?.from?.pathname || '/dashboard'
+      navigate(from, { replace: true })
     }
-  }, [user, isLoading, navigate, location.state]);
+  }, [user, isLoading, navigate, location.state])
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
+    e.preventDefault()
+    setError(null)
 
-    try {
-      await login(email, password);
-    } catch (err) {
-      console.error('Erro no login:', err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Falha ao fazer login. Verifique suas credenciais.'
-      );
+    const result = await login(email, password)
+    if (!result.success) {
+      setError(result.error)
     }
-  };
+  }
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen w-full bg-[#1e1e1e]">
         <div className="text-white">Carregando...</div>
       </div>
-    );
+    )
   }
 
-  if (user) return null;
+  if (user) return null
 
   return (
     <div className="flex items-center justify-center h-screen w-full bg-[#1e1e1e] p-4">
@@ -127,7 +122,7 @@ const LoginPage: React.FC = () => {
         </CardFooter>
       </Card>
     </div>
-  );
-};
+  )
+}
 
-export default LoginPage;
+export default LoginPage
