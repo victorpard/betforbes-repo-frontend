@@ -1,0 +1,114 @@
+import { useState, useEffect } from 'react';
+import { apiService, type AffiliateStats, type ReferralUser } from '../services/apiService';
+
+interface UseAffiliatesReturn {
+  // Estados
+  stats: AffiliateStats | null;
+  referralLink: string;
+  referralCode: string;
+  referrals: ReferralUser[];
+  
+  // Estados de loading
+  isLoadingStats: boolean;
+  isLoadingLink: boolean;
+  isLoadingReferrals: boolean;
+  
+  // Estados de erro
+  error: string | null;
+  
+  // Funções
+  refreshStats: () => Promise<void>;
+  refreshReferrals: () => Promise<void>;
+  copyReferralLink: () => Promise<boolean>;
+}
+
+export const useAffiliates = (): UseAffiliatesReturn => {
+  const [stats, setStats] = useState<AffiliateStats | null>(null);
+  const [referralLink, setReferralLink] = useState<string>('');
+  const [referralCode, setReferralCode] = useState<string>('');
+  const [referrals, setReferrals] = useState<ReferralUser[]>([]);
+  
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
+  const [isLoadingLink, setIsLoadingLink] = useState(false);
+  const [isLoadingReferrals, setIsLoadingReferrals] = useState(false);
+  
+  const [error, setError] = useState<string | null>(null);
+
+  // Carregar link de referência
+  const loadReferralLink = async () => {
+    setIsLoadingLink(true);
+    setError(null);
+    
+    try {
+      const data = await apiService.getReferralLink();
+      setReferralLink(data.data?.referralLink || "");
+      setReferralCode(data.data?.referralCode || "");
+    } catch (err: any) {
+      setError(err.message || 'Erro ao carregar link');
+    } finally {
+      setIsLoadingLink(false);
+    }
+  };
+
+  // Carregar estatísticas
+  const refreshStats = async () => {
+    setIsLoadingStats(true);
+    setError(null);
+    
+    try {
+      const data = await apiService.getAffiliateStats();
+      setStats(data.data || null);
+    } catch (err: any) {
+      setError(err.message || 'Erro ao carregar estatísticas');
+    } finally {
+      setIsLoadingStats(false);
+    }
+  };
+
+  // Carregar referrals
+  const refreshReferrals = async () => {
+    setIsLoadingReferrals(true);
+    setError(null);
+    
+    try {
+      const data = await apiService.getReferralsList();
+      setReferrals(data.data || []);
+    } catch (err: any) {
+      setError(err.message || 'Erro ao carregar referrals');
+    } finally {
+      setIsLoadingReferrals(false);
+    }
+  };
+
+  // Copiar link para clipboard
+  const copyReferralLink = async (): Promise<boolean> => {
+    try {
+      await navigator.clipboard.writeText(referralLink);
+      return true;
+    } catch (err) {
+      console.error('Erro ao copiar link:', err);
+      return false;
+    }
+  };
+
+  // Carregar dados iniciais
+  useEffect(() => {
+    loadReferralLink();
+    refreshStats();
+    refreshReferrals();
+  }, []);
+
+  return {
+    stats,
+    referralLink,
+    referralCode,
+    referrals,
+    isLoadingStats,
+    isLoadingLink,
+    isLoadingReferrals,
+    error,
+    refreshStats,
+    refreshReferrals,
+    copyReferralLink
+  };
+};
