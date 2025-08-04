@@ -1,0 +1,21 @@
+# dependências
+node_modules/
+
+# build output — remova se versionar dist/
+dist/
+
+# históricos antigos
+dist-old/
+
+# ambiente / segredos
+.env
+.env.*.local
+
+# logs
+*.log
+
+# caches
+.cache/
+
+# snapshots / tarballs
+*.tar.gz
