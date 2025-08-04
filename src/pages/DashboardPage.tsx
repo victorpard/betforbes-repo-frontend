@@ -36,6 +36,11 @@ const DashboardPage: React.FC = () => {
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold">Dashboard</h1>
+      <div className="mt-4 mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div>
+          <span className="font-semibold">Seu código de afiliado:</span> <code className="bg-gray-800 px-2 py-1 rounded">{balance !== null && balance !== undefined ? "" : ""}</code>
+        </div>
+      </div>
       <p className="mt-2 text-lg">Saldo Fictício: {balance.toFixed(2)} USDT</p>
       <table className="w-full mt-4">
         <thead>

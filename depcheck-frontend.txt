@@ -1,0 +1,11 @@
+Unused devDependencies
+* autoprefixer
+* depcheck
+* postcss
+* tailwindcss
+* typescript
+Missing dependencies
+* @types/node: ./tsconfig.node.json
+* @testing-library/react: ./src/App.test.js
+* web-vitals: ./src/reportWebVitals.js
+* @testing-library/jest-dom: ./src/setupTests.js

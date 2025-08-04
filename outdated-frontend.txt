@@ -1,0 +1,11 @@
+Package               Current   Wanted  Latest  Location                           Depended by
+@types/react          18.3.23  18.3.23  19.1.9  node_modules/@types/react          betforbes-repo-frontend
+@types/react-dom       18.3.7   18.3.7  19.1.7  node_modules/@types/react-dom      betforbes-repo-frontend
+@vitejs/plugin-react    4.5.1    4.7.0   4.7.0  node_modules/@vitejs/plugin-react  betforbes-repo-frontend
+axios                  1.10.0   1.11.0  1.11.0  node_modules/axios                 betforbes-repo-frontend
+react                  18.3.1   18.3.1  19.1.1  node_modules/react                 betforbes-repo-frontend
+react-dom              18.3.1   18.3.1  19.1.1  node_modules/react-dom             betforbes-repo-frontend
+react-router-dom       6.30.1   6.30.1   7.7.1  node_modules/react-router-dom      betforbes-repo-frontend
+tailwindcss            3.4.17   3.4.17  4.1.11  node_modules/tailwindcss           betforbes-repo-frontend
+typescript              5.8.3    5.9.2   5.9.2  node_modules/typescript            betforbes-repo-frontend
+vite                   5.4.19   5.4.19   7.0.6  node_modules/vite                  betforbes-repo-frontend

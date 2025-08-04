@@ -1,5 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { apiService, AuthResponse, LoginRequest, RegisterRequest } from '../services/apiService';
+import {
+  apiService,
+  AuthResponse,
+  LoginRequest,
+  RegisterRequest,
+} from '../services/apiService';
 import { toast } from 'react-toastify';
 
 interface User {
@@ -17,9 +22,16 @@ interface AuthContextType {
   isAuthenticated: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (payload: RegisterPayload) => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
+}
+
+export interface RegisterPayload {
+  name: string;
+  email: string;
+  password: string;
+  referral?: string;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -40,7 +52,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const isAuthenticated = !!user;
 
-  // Reidrata e valida o token ao montar
   useEffect(() => {
     const initializeAuth = async () => {
       const storedToken = localStorage.getItem('accessToken');
@@ -81,11 +92,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const res = (await apiService.login({ email, password } as LoginRequest)) as AuthResponse;
       console.log('📦 AuthContext: Resposta do login:', res);
 
-      if (!res.success || !res.data?.tokens.accessToken) {
+      if (!res.success || !res.data?.tokens?.accessToken) {
         throw new Error(res.message || 'Falha no login');
       }
 
-      // Persiste tokens e configura header
       localStorage.setItem('accessToken', res.data.tokens.accessToken);
       localStorage.setItem('refreshToken', res.data.tokens.refreshToken);
       apiService.setAuthHeader(res.data.tokens.accessToken);
@@ -106,26 +116,42 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const register = async (name: string, email: string, password: string): Promise<void> => {
+  const register = async (payload: RegisterPayload): Promise<void> => {
     setIsLoading(true);
     setError(null);
     try {
-      console.log('📝 AuthContext: Iniciando registro...');
-      const res = (await apiService.register({ name, email, password } as RegisterRequest)) as AuthResponse;
+      console.log('📝 AuthContext: Iniciando registro...', payload);
+      const req: RegisterRequest & { referral?: string } = {
+        name: payload.name,
+        email: payload.email,
+        password: payload.password,
+      };
+      if (payload.referral) req.referral = payload.referral;
+
+      const res = (await apiService.register(req as any)) as AuthResponse;
       console.log('📦 AuthContext: Resposta do registro:', res);
 
-      if (!res.success || !res.data?.tokens.accessToken) {
-        throw new Error(res.message || 'Falha no registro');
+      // Se devolveu token de autenticação, faz login automático
+      if (res.success && res.data?.tokens?.accessToken) {
+        localStorage.setItem('accessToken', res.data.tokens.accessToken);
+        localStorage.setItem('refreshToken', res.data.tokens.refreshToken);
+        apiService.setAuthHeader(res.data.tokens.accessToken);
+        setUser(res.data.user);
+        toast.success('🎉 Registro e login automático realizados com sucesso!');
+        console.log('✅ AuthContext: Registro com login automático');
+        return;
       }
 
-      // Persiste tokens e configura header
-      localStorage.setItem('accessToken', res.data.tokens.accessToken);
-      localStorage.setItem('refreshToken', res.data.tokens.refreshToken);
-      apiService.setAuthHeader(res.data.tokens.accessToken);
+      // Registro bem-sucedido, porém sem token (ex: precisa verificar email)
+      if (res.success) {
+        setUser(null); // não autentica
+        toast.success(res.message || 'Cadastro realizado. Verifique seu email para ativar a conta.');
+        console.log('ℹ️ AuthContext: Registro realizado, aguardando verificação de email');
+        return;
+      }
 
-      setUser(res.data.user);
-      toast.success('🎉 Registro realizado com sucesso!');
-      console.log('✅ AuthContext: Registro bem-sucedido');
+      // Caso genérico de falha
+      throw new Error(res.message || 'Falha no registro');
     } catch (err: any) {
       console.error('❌ AuthContext: Erro no registro:', err);
       setUser(null);

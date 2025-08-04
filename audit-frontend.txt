@@ -1,0 +1,13 @@
+npm warn config production Use `--omit=dev` instead.
+# npm audit report
+
+form-data  4.0.0 - 4.0.3
+Severity: critical
+form-data uses unsafe random function in form-data for choosing boundary - https://github.com/advisories/GHSA-fjxv-7rqg-78g4
+fix available via `npm audit fix`
+node_modules/form-data
+
+1 critical severity vulnerability
+
+To address all issues, run:
+  npm audit fix

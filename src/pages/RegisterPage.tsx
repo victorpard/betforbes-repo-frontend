@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
+import { useAuth, RegisterPayload } from '../contexts/AuthContext';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,16 +18,30 @@ const RegisterPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [referral, setReferral] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const { register, user, isLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const validatePassword = (pwd: string) => {
     const regex =
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+{}\[\]:;"'<>,.?/~\\-]).{8,}$/;
     return regex.test(pwd);
   };
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const refFromUrl = params.get('ref') || undefined;
+    if (refFromUrl) {
+      setReferral(refFromUrl);
+      localStorage.setItem('referral', refFromUrl);
+    } else {
+      const stored = localStorage.getItem('referral');
+      if (stored) setReferral(stored);
+    }
+  }, [location.search]);
 
   useEffect(() => {
     if (!isLoading && user) {
@@ -53,12 +67,19 @@ const RegisterPage: React.FC = () => {
     }
 
     try {
-      await register(name, email, password);
+      const payload: RegisterPayload = {
+        name,
+        email,
+        password,
+      };
+      if (referral) payload.referral = referral;
+
+      await register(payload);
       setSuccessMessage(
         '✅ Cadastro efetuado com sucesso! Verifique seu e-mail para ativar a conta.'
       );
     } catch (err: any) {
-      setError(err.message || 'Erro ao registrar. Tente novamente.');
+      setError(err?.message || 'Erro ao registrar. Tente novamente.');
     }
   };
 
@@ -76,7 +97,9 @@ const RegisterPage: React.FC = () => {
     <div className="flex items-center justify-center min-h-screen bg-[#1e1e1e] px-4 py-8">
       <Card className="w-full max-w-sm bg-[#2a2a2a] text-white border-none shadow-lg">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center text-[#FFD700]">BETFORBES</CardTitle>
+          <CardTitle className="text-2xl font-bold text-center text-[#FFD700]">
+            BETFORBES
+          </CardTitle>
           <CardDescription className="text-gray-400 text-center">
             Crie sua conta para começar a usar a plataforma
           </CardDescription>
@@ -89,12 +112,16 @@ const RegisterPage: React.FC = () => {
           )}
           {successMessage && (
             <div className="bg-green-700 bg-opacity-20 border border-green-600 rounded-lg p-3">
-              <p className="text-green-400 text-sm">✅ {successMessage}</p>
+              <p className="text-green-400 text-sm">
+                ✅ {successMessage}
+              </p>
             </div>
           )}
           <form onSubmit={handleSubmit} className="grid gap-4">
             <div className="grid gap-2">
-              <Label htmlFor="name" className="text-gray-300">Nome</Label>
+              <Label htmlFor="name" className="text-gray-300">
+                Nome
+              </Label>
               <Input
                 id="name"
                 type="text"
@@ -106,7 +133,9 @@ const RegisterPage: React.FC = () => {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="email" className="text-gray-300">Email</Label>
+              <Label htmlFor="email" className="text-gray-300">
+                Email
+              </Label>
               <Input
                 id="email"
                 type="email"
@@ -118,7 +147,9 @@ const RegisterPage: React.FC = () => {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="password" className="text-gray-300">Senha</Label>
+              <Label htmlFor="password" className="text-gray-300">
+                Senha
+              </Label>
               <Input
                 id="password"
                 type="password"
@@ -130,7 +161,9 @@ const RegisterPage: React.FC = () => {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="confirmPassword" className="text-gray-300">Confirmar Senha</Label>
+              <Label htmlFor="confirmPassword" className="text-gray-300">
+                Confirmar Senha
+              </Label>
               <Input
                 id="confirmPassword"
                 type="password"
