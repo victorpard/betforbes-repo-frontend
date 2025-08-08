@@ -1,0 +1,756 @@
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import axios from 'axios';
+
+// 1) Configurações globais do axios:
+axios.defaults.baseURL = '/api';
+axios.defaults.withCredentials = true;
+
+export interface RegisterPayload {
+  name: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  referralCode?: string;
+}
+
+export interface LoginPayload {
+  email: string;
+  password: string;
+}
+
+interface AuthContextData {
+  user: any | null;
+  isLoading: boolean;
+  register: (payload: RegisterPayload) => Promise<void>;
+  login: (payload: LoginPayload) => Promise<void>;
+  logout: () => void;
+}
+
+const AuthContext = createContext<AuthContextData>({} as AuthContextData);
+
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const [user, setUser] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  const register = async (payload: RegisterPayload) => {
+    setIsLoading(true);
+    try {
+      await axios.post('/auth/register', payload);
+      console.log('Registro OK — verifique seu email');
+    } catch (err: any) {
+      console.error('Erro no registro:', err.response?.data?.message || err.message);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const login = async (payload: LoginPayload) => {
+    setIsLoading(true);
+    try {
+      const resp = await axios.post('/auth/login', payload);
+      const token = resp.data.data.tokens.accessToken;
+      // salva token e seta header
+      localStorage.setItem('token', token);
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      // popula user
+      setUser(resp.data.data.user);
+    } catch (err) {
+      console.error('Erro no login:', err);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem('token');
+    delete axios.defaults.headers.common['Authorization'];
+    setUser(null);
+  };
+
+  // Ao montar o provider, tenta restaurar o estado de autenticação
+  useEffect(() => {
+    (async () => {
+      const token = localStorage.getItem('token');
+      console.log('🔍 AuthContext: token no storage:', token);
+
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
+
+      // seta o header antes de qualquer chamada
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
+      try {
+        // 1) valida o token
+        const valida = await axios.get('/auth/validate-token');
+        if (!valida.data.success) {
+          throw new Error('Token inválido');
+        }
+        console.log('✅ AuthContext: Token válido');
+
+        // 2) busca o perfil
+        const perfil = await axios.get('/auth/profile');
+        setUser(perfil.data.data.user);
+        console.log('✅ AuthContext: perfil restaurado');
+      } catch (err) {
+        console.error('🔴 AuthContext: erro ao validar ou restaurar:', err);
+        logout();
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, []);
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        isLoading,
+        register,
+        login,
+        logout
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = (): AuthContextData => useContext(AuthContext);
+1~import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import axios from 'axios';
+
+// 1) Configurações globais do axios:
+axios.defaults.baseURL = '/api';
+axios.defaults.withCredentials = true;
+
+export interface RegisterPayload {
+  name: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  referralCode?: string;
+}
+
+export interface LoginPayload {
+  email: string;
+  password: string;
+}
+
+interface AuthContextData {
+  user: any | null;
+  isLoading: boolean;
+  register: (payload: RegisterPayload) => Promise<void>;
+  login: (payload: LoginPayload) => Promise<void>;
+  logout: () => void;
+}
+
+const AuthContext = createContext<AuthContextData>({} as AuthContextData);
+
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const [user, setUser] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  const register = async (payload: RegisterPayload) => {
+    setIsLoading(true);
+    try {
+      await axios.post('/auth/register', payload);
+      console.log('Registro OK — verifique seu email');
+    } catch (err: any) {
+      console.error('Erro no registro:', err.response?.data?.message || err.message);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const login = async (payload: LoginPayload) => {
+    setIsLoading(true);
+    try {
+      const resp = await axios.post('/auth/login', payload);
+      const token = resp.data.data.tokens.accessToken;
+      // salva token e seta header
+      localStorage.setItem('token', token);
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      // popula user
+      setUser(resp.data.data.user);
+    } catch (err) {
+      console.error('Erro no login:', err);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem('token');
+    delete axios.defaults.headers.common['Authorization'];
+    setUser(null);
+  };
+
+  // Ao montar o provider, tenta restaurar o estado de autenticação
+  useEffect(() => {
+    (async () => {
+      const token = localStorage.getItem('token');
+      console.log('🔍 AuthContext: token no storage:', token);
+
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
+
+      // seta o header antes de qualquer chamada
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
+      try {
+        // 1) valida o token
+        const valida = await axios.get('/auth/validate-token');
+        if (!valida.data.success) {
+          throw new Error('Token inválido');
+        }
+        console.log('✅ AuthContext: Token válido');
+
+        // 2) busca o perfil
+        const perfil = await axios.get('/auth/profile');
+        setUser(perfil.data.data.user);
+        console.log('✅ AuthContext: perfil restaurado');
+      } catch (err) {
+        console.error('🔴 AuthContext: erro ao validar ou restaurar:', err);
+        logout();
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, []);
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        isLoading,
+        register,
+        login,
+        logout
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = (): AuthContextData => useContext(AuthContext);
+1~import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import axios from 'axios';
+
+// 1) Configurações globais do axios:
+axios.defaults.baseURL = '/api';
+axios.defaults.withCredentials = true;
+
+export interface RegisterPayload {
+  name: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  referralCode?: string;
+}
+
+export interface LoginPayload {
+  email: string;
+  password: string;
+}
+
+interface AuthContextData {
+  user: any | null;
+  isLoading: boolean;
+  register: (payload: RegisterPayload) => Promise<void>;
+  login: (payload: LoginPayload) => Promise<void>;
+  logout: () => void;
+}
+
+const AuthContext = createContext<AuthContextData>({} as AuthContextData);
+
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const [user, setUser] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  const register = async (payload: RegisterPayload) => {
+    setIsLoading(true);
+    try {
+      await axios.post('/auth/register', payload);
+      console.log('Registro OK — verifique seu email');
+    } catch (err: any) {
+      console.error('Erro no registro:', err.response?.data?.message || err.message);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const login = async (payload: LoginPayload) => {
+    setIsLoading(true);
+    try {
+      const resp = await axios.post('/auth/login', payload);
+      const token = resp.data.data.tokens.accessToken;
+      // salva token e seta header
+      localStorage.setItem('token', token);
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      // popula user
+      setUser(resp.data.data.user);
+    } catch (err) {
+      console.error('Erro no login:', err);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem('token');
+    delete axios.defaults.headers.common['Authorization'];
+    setUser(null);
+  };
+
+  // Ao montar o provider, tenta restaurar o estado de autenticação
+  useEffect(() => {
+    (async () => {
+      const token = localStorage.getItem('token');
+      console.log('🔍 AuthContext: token no storage:', token);
+
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
+
+      // seta o header antes de qualquer chamada
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
+      try {
+        // 1) valida o token
+        const valida = await axios.get('/auth/validate-token');
+        if (!valida.data.success) {
+          throw new Error('Token inválido');
+        }
+        console.log('✅ AuthContext: Token válido');
+
+        // 2) busca o perfil
+        const perfil = await axios.get('/auth/profile');
+        setUser(perfil.data.data.user);
+        console.log('✅ AuthContext: perfil restaurado');
+      } catch (err) {
+        console.error('🔴 AuthContext: erro ao validar ou restaurar:', err);
+        logout();
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, []);
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        isLoading,
+        register,
+        login,
+        logout
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = (): AuthContextData => useContext(AuthContext);
+1~import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import axios from 'axios';
+
+// 1) Configurações globais do axios:
+axios.defaults.baseURL = '/api';
+axios.defaults.withCredentials = true;
+
+export interface RegisterPayload {
+  name: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  referralCode?: string;
+}
+
+export interface LoginPayload {
+  email: string;
+  password: string;
+}
+
+interface AuthContextData {
+  user: any | null;
+  isLoading: boolean;
+  register: (payload: RegisterPayload) => Promise<void>;
+  login: (payload: LoginPayload) => Promise<void>;
+  logout: () => void;
+}
+
+const AuthContext = createContext<AuthContextData>({} as AuthContextData);
+
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const [user, setUser] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  const register = async (payload: RegisterPayload) => {
+    setIsLoading(true);
+    try {
+      await axios.post('/auth/register', payload);
+      console.log('Registro OK — verifique seu email');
+    } catch (err: any) {
+      console.error('Erro no registro:', err.response?.data?.message || err.message);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const login = async (payload: LoginPayload) => {
+    setIsLoading(true);
+    try {
+      const resp = await axios.post('/auth/login', payload);
+      const token = resp.data.data.tokens.accessToken;
+      // salva token e seta header
+      localStorage.setItem('token', token);
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      // popula user
+      setUser(resp.data.data.user);
+    } catch (err) {
+      console.error('Erro no login:', err);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem('token');
+    delete axios.defaults.headers.common['Authorization'];
+    setUser(null);
+  };
+
+  // Ao montar o provider, tenta restaurar o estado de autenticação
+  useEffect(() => {
+    (async () => {
+      const token = localStorage.getItem('token');
+      console.log('🔍 AuthContext: token no storage:', token);
+
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
+
+      // seta o header antes de qualquer chamada
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
+      try {
+        // 1) valida o token
+        const valida = await axios.get('/auth/validate-token');
+        if (!valida.data.success) {
+          throw new Error('Token inválido');
+        }
+        console.log('✅ AuthContext: Token válido');
+
+        // 2) busca o perfil
+        const perfil = await axios.get('/auth/profile');
+        setUser(perfil.data.data.user);
+        console.log('✅ AuthContext: perfil restaurado');
+      } catch (err) {
+        console.error('🔴 AuthContext: erro ao validar ou restaurar:', err);
+        logout();
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, []);
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        isLoading,
+        register,
+        login,
+        logout
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = (): AuthContextData => useContext(AuthContext);
+1~import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import axios from 'axios';
+
+// 1) Configurações globais do axios:
+axios.defaults.baseURL = '/api';
+axios.defaults.withCredentials = true;
+
+export interface RegisterPayload {
+  name: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  referralCode?: string;
+}
+
+export interface LoginPayload {
+  email: string;
+  password: string;
+}
+
+interface AuthContextData {
+  user: any | null;
+  isLoading: boolean;
+  register: (payload: RegisterPayload) => Promise<void>;
+  login: (payload: LoginPayload) => Promise<void>;
+  logout: () => void;
+}
+
+const AuthContext = createContext<AuthContextData>({} as AuthContextData);
+
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const [user, setUser] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  const register = async (payload: RegisterPayload) => {
+    setIsLoading(true);
+    try {
+      await axios.post('/auth/register', payload);
+      console.log('Registro OK — verifique seu email');
+    } catch (err: any) {
+      console.error('Erro no registro:', err.response?.data?.message || err.message);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const login = async (payload: LoginPayload) => {
+    setIsLoading(true);
+    try {
+      const resp = await axios.post('/auth/login', payload);
+      const token = resp.data.data.tokens.accessToken;
+      // salva token e seta header
+      localStorage.setItem('token', token);
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      // popula user
+      setUser(resp.data.data.user);
+    } catch (err) {
+      console.error('Erro no login:', err);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem('token');
+    delete axios.defaults.headers.common['Authorization'];
+    setUser(null);
+  };
+
+  // Ao montar o provider, tenta restaurar o estado de autenticação
+  useEffect(() => {
+    (async () => {
+      const token = localStorage.getItem('token');
+      console.log('🔍 AuthContext: token no storage:', token);
+
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
+
+      // seta o header antes de qualquer chamada
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
+      try {
+        // 1) valida o token
+        const valida = await axios.get('/auth/validate-token');
+        if (!valida.data.success) {
+          throw new Error('Token inválido');
+        }
+        console.log('✅ AuthContext: Token válido');
+
+        // 2) busca o perfil
+        const perfil = await axios.get('/auth/profile');
+        setUser(perfil.data.data.user);
+        console.log('✅ AuthContext: perfil restaurado');
+      } catch (err) {
+        console.error('🔴 AuthContext: erro ao validar ou restaurar:', err);
+        logout();
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, []);
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        isLoading,
+        register,
+        login,
+        logout
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = (): AuthContextData => useContext(AuthContext);
+1~import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import axios from 'axios';
+
+// 1) Configurações globais do axios:
+axios.defaults.baseURL = '/api';
+axios.defaults.withCredentials = true;
+
+export interface RegisterPayload {
+  name: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  referralCode?: string;
+}
+
+export interface LoginPayload {
+  email: string;
+  password: string;
+}
+
+interface AuthContextData {
+  user: any | null;
+  isLoading: boolean;
+  register: (payload: RegisterPayload) => Promise<void>;
+  login: (payload: LoginPayload) => Promise<void>;
+  logout: () => void;
+}
+
+const AuthContext = createContext<AuthContextData>({} as AuthContextData);
+
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const [user, setUser] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  const register = async (payload: RegisterPayload) => {
+    setIsLoading(true);
+    try {
+      await axios.post('/auth/register', payload);
+      console.log('Registro OK — verifique seu email');
+    } catch (err: any) {
+      console.error('Erro no registro:', err.response?.data?.message || err.message);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const login = async (payload: LoginPayload) => {
+    setIsLoading(true);
+    try {
+      const resp = await axios.post('/auth/login', payload);
+      const token = resp.data.data.tokens.accessToken;
+      // salva token e seta header
+      localStorage.setItem('token', token);
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      // popula user
+      setUser(resp.data.data.user);
+    } catch (err) {
+      console.error('Erro no login:', err);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem('token');
+    delete axios.defaults.headers.common['Authorization'];
+    setUser(null);
+  };
+
+  // Ao montar o provider, tenta restaurar o estado de autenticação
+  useEffect(() => {
+    (async () => {
+      const token = localStorage.getItem('token');
+      console.log('🔍 AuthContext: token no storage:', token);
+
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
+
+      // seta o header antes de qualquer chamada
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
+      try {
+        // 1) valida o token
+        const valida = await axios.get('/auth/validate-token');
+        if (!valida.data.success) {
+          throw new Error('Token inválido');
+        }
+        console.log('✅ AuthContext: Token válido');
+
+        // 2) busca o perfil
+        const perfil = await axios.get('/auth/profile');
+        setUser(perfil.data.data.user);
+        console.log('✅ AuthContext: perfil restaurado');
+      } catch (err) {
+        console.error('🔴 AuthContext: erro ao validar ou restaurar:', err);
+        logout();
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, []);
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        isLoading,
+        register,
+        login,
+        logout
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = (): AuthContextData => useContext(AuthContext);

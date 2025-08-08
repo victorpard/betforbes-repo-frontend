@@ -1,0 +1,136 @@
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+
+const RegisterPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { register, isLoading, user } = useAuth();
+
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+  });
+  const [error, setError] = useState<string | null>(null);
+
+  // se já estiver logado, vai pro dashboard
+  if (user) {
+    navigate('/dashboard');
+    return null;
+  }
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (form.password !== form.confirmPassword) {
+      setError('As senhas não coincidem.');
+      return;
+    }
+
+    try {
+      await register({
+        name: form.name,
+        email: form.email,
+        password: form.password,
+        confirmPassword: form.confirmPassword,
+      });
+      navigate('/login');
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.message || 'Erro ao registrar');
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#1e1e1e]">
+      <Card className="w-full max-w-md bg-[#2a2a2a] text-white">
+        <CardHeader className="text-center">
+          <CardTitle>BETFORBES</CardTitle>
+          <p>Crie sua conta para começar a usar a plataforma</p>
+        </CardHeader>
+        <CardContent>
+          {error && <div className="text-red-500 mb-4">{error}</div>}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Nome */}
+            <div>
+              <label className="block text-sm font-medium text-white">Nome</label>
+              <Input
+                name="name"
+                value={form.name}
+                onChange={handleChange}
+                placeholder="Seu nome"
+                required
+              />
+            </div>
+
+            {/* Email */}
+            <div>
+              <label className="block text-sm font-medium text-white">Email</label>
+              <Input
+                type="email"
+                name="email"
+                value={form.email}
+                onChange={handleChange}
+                placeholder="seu@email.com"
+                required
+              />
+            </div>
+
+            {/* Senha */}
+            <div>
+              <label className="block text-sm font-medium text-white">Senha</label>
+              <Input
+                type="password"
+                name="password"
+                value={form.password}
+                onChange={handleChange}
+                placeholder="••••••••"
+                required
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                A senha deve ter pelo menos 8 caracteres, incluindo:
+                <br />• 1 letra maiúscula
+                <br />• 1 letra minúscula
+                <br />• 1 número
+                <br />• 1 caractere especial
+              </p>
+            </div>
+
+            {/* Confirmar Senha */}
+            <div>
+              <label className="block text-sm font-medium text-white">Confirmar Senha</label>
+              <Input
+                type="password"
+                name="confirmPassword"
+                value={form.confirmPassword}
+                onChange={handleChange}
+                placeholder="••••••••"
+                required
+              />
+            </div>
+
+            {/* Botão */}
+            <Button type="submit" disabled={isLoading} className="w-full">
+              {isLoading ? 'Criando...' : 'Criar conta'}
+            </Button>
+          </form>
+        </CardContent>
+        <div className="text-center py-4">
+          <Link to="/login" className="text-[#FFD700]">
+            Já tenho conta? Faça login
+          </Link>
+        </div>
+      </Card>
+    </div>
+  );
+};
+
+export default RegisterPage;

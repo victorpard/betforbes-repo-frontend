@@ -1,0 +1,52 @@
+cimport React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { login as loginService, logout as logoutService } from '@/services/apiService';
+
+interface AuthContextType {
+  user: User | null;
+  isLoading: boolean;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  logout: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Inicialização: apenas para indicar carregamento concluído
+    setIsLoading(false);
+  }, []);
+
+    try {
+      const res = await loginService(email, password);
+      if (res.success) {
+        setUser(res.data.user);
+      }
+      return res;
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Erro no login' };
+    }
+  };
+
+  const logout = async () => {
+    await logoutService();
+    setUser(null);
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+// Custom hook
+export const useAuth = (): AuthContextType => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
