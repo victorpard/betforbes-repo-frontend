@@ -1,0 +1,8 @@
+node_modules
+dist
+build
+coverage
+.git
+.vscode
+public/*.svg
+public/*.png
