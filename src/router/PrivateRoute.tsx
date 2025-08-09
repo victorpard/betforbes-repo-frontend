@@ -25,12 +25,6 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ isAdminRoute = false }) => 
   // PROTEÇÃO CRÍTICA: Verificar se realmente está autenticado
   if (!isAuthenticated || !user) {
     console.log('PrivateRoute: Usuário não autenticado, redirecionando para /login');
-    // Limpar qualquer dado inválido
-    localStorage.removeItem('betforbes_auth');
-    localStorage.removeItem('betforbes_token');
-    sessionStorage.clear();
-    
-    // Redirecionar para login preservando a rota de destino
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
@@ -40,9 +34,7 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ isAdminRoute = false }) => 
     return <Navigate to="/dashboard" replace />;
   }
 
-  // Se passou por todas as verificações de segurança, renderiza a rota
   return <Outlet />;
 };
 
 export default PrivateRoute;
-

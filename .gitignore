@@ -1,11 +1,9 @@
 node_modules/
 dist/
-build/
-.cache/
-coverage/
-.env
-.env.*
-*.log
+npm-debug.log*
+pnpm-lock.yaml
+yarn.lock
 .DS_Store
-
-!.env.example
+.env
+.env.local
+.env.*.local

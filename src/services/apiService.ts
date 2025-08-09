@@ -42,6 +42,9 @@ class ApiService {
     'Content-Type': 'application/json'
   };
 
+  private isRefreshing = false;
+  private refreshPromise: Promise<AuthResponse> | null = null;
+
   private getAuthHeaders(): HeadersInit {
     const token = localStorage.getItem('accessToken');
     return {
@@ -50,7 +53,33 @@ class ApiService {
     };
   }
 
-  private async handleResponse<T>(response: Response): Promise<T> {
+  private async handleResponse<T>(response: Response, originalRequest?: () => Promise<Response>): Promise<T> {
+    // Se a resposta é 401 e temos um refresh token, tenta renovar
+    if (response.status === 401 && originalRequest && !this.isRefreshing) {
+      const refreshToken = localStorage.getItem('refreshToken');
+      
+      if (refreshToken) {
+        try {
+          console.log('🔄 ApiService: Token expirado, tentando renovar...');
+          const refreshResponse = await this.refreshToken();
+          
+          if (refreshResponse.success && refreshResponse.data?.tokens.accessToken) {
+            console.log('✅ ApiService: Token renovado, repetindo requisição original');
+            // Repete a requisição original com o novo token
+            const retryResponse = await originalRequest();
+            return this.handleResponse<T>(retryResponse);
+          }
+        } catch (refreshError) {
+          console.error('❌ ApiService: Falha ao renovar token', refreshError);
+          this.clearAuthData();
+          // Redireciona para login se estiver no browser
+          if (typeof window !== 'undefined') {
+            window.location.href = '/login';
+          }
+        }
+      }
+    }
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ message: 'Erro de rede' }));
       throw {
@@ -76,6 +105,21 @@ class ApiService {
     };
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
+    localStorage.removeItem('betforbes_user');
+  }
+
+  // Método auxiliar para fazer requisições com retry automático
+  private async makeAuthenticatedRequest<T>(
+    url: string, 
+    options: RequestInit
+  ): Promise<T> {
+    const makeRequest = () => fetch(url, {
+      ...options,
+      headers: this.getAuthHeaders(),
+    });
+
+    const response = await makeRequest();
+    return this.handleResponse<T>(response, makeRequest);
   }
 
   // Login
@@ -116,34 +160,48 @@ class ApiService {
 
   // Validar token
   async validateToken(): Promise<AuthResponse> {
-    const response = await fetch(`${API_BASE_URL}/auth/validate`, {
+    return this.makeAuthenticatedRequest<AuthResponse>(`${API_BASE_URL}/auth/validate`, {
       method: 'GET',
-      headers: this.getAuthHeaders(),
     });
-    return this.handleResponse<AuthResponse>(response);
   }
 
   // Refresh token
   async refreshToken(): Promise<AuthResponse> {
+    // Evita múltiplas tentativas simultâneas de refresh
+    if (this.isRefreshing && this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
     const refreshToken = localStorage.getItem('refreshToken');
     if (!refreshToken) {
       throw { message: 'Refresh token não encontrado', status: 401 } as ApiError;
     }
 
-    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
-    });
-    const data = await this.handleResponse<AuthResponse>(response);
+    this.isRefreshing = true;
+    this.refreshPromise = (async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken }),
+        });
+        
+        const data = await this.handleResponse<AuthResponse>(response);
 
-    if (data.success && data.data?.tokens.accessToken) {
-      localStorage.setItem('accessToken', data.data.tokens.accessToken);
-      localStorage.setItem('refreshToken', data.data.tokens.refreshToken);
-      this.setAuthHeader(data.data.tokens.accessToken);
-    }
+        if (data.success && data.data?.tokens.accessToken) {
+          localStorage.setItem('accessToken', data.data.tokens.accessToken);
+          localStorage.setItem('refreshToken', data.data.tokens.refreshToken);
+          this.setAuthHeader(data.data.tokens.accessToken);
+        }
 
-    return data;
+        return data;
+      } finally {
+        this.isRefreshing = false;
+        this.refreshPromise = null;
+      }
+    })();
+
+    return this.refreshPromise;
   }
 
   // Logout
@@ -169,11 +227,9 @@ class ApiService {
 
   // Perfil
   async getUserProfile(): Promise<AuthResponse> {
-    const response = await fetch(`${API_BASE_URL}/user/profile`, {
+    return this.makeAuthenticatedRequest<AuthResponse>(`${API_BASE_URL}/user/profile`, {
       method: 'GET',
-      headers: this.getAuthHeaders(),
     });
-    return this.handleResponse<AuthResponse>(response);
   }
 }
 

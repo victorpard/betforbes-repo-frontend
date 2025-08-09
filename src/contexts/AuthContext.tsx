@@ -33,6 +33,29 @@ const AuthContext = createContext<AuthContextType>({
   clearError: () => {},
 });
 
+/** Helpers: aceitam formatos diferentes de resposta (top-level ou data.tokens) */
+function extractTokens(res: AuthResponse | any): { accessToken: string | null; refreshToken: string | null } {
+  const accessToken =
+    res?.data?.tokens?.accessToken ??
+    res?.data?.accessToken ??
+    res?.data?.token ??
+    res?.accessToken ??
+    res?.token ??
+    null;
+
+  const refreshToken =
+    res?.data?.tokens?.refreshToken ??
+    res?.data?.refreshToken ??
+    res?.refreshToken ??
+    null;
+
+  return { accessToken, refreshToken };
+}
+
+function extractUser(res: AuthResponse | any): User | null {
+  return (res?.data?.user ?? res?.user ?? null) as User | null;
+}
+
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -40,39 +63,127 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const isAuthenticated = !!user;
 
-  // Reidrata e valida o token ao montar
+  /** Persistência leve do usuário (UX mais rápida no F5) */
+  const saveUserData = (userData: User) => {
+    try {
+      localStorage.setItem('betforbes_user', JSON.stringify(userData));
+      setUser(userData);
+      console.log('✅ AuthContext: Dados do usuário salvos no localStorage');
+    } catch (err) {
+      console.error('❌ AuthContext: Erro ao salvar dados do usuário', err);
+    }
+  };
+
+  const loadUserData = (): User | null => {
+    try {
+      const raw = localStorage.getItem('betforbes_user');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      console.log('✅ AuthContext: Dados do usuário carregados do localStorage', parsed);
+      return parsed;
+    } catch (err) {
+      console.error('❌ AuthContext: Erro ao carregar dados do usuário', err);
+      localStorage.removeItem('betforbes_user');
+      return null;
+    }
+  };
+
+  const clearAllAuthData = () => {
+    setUser(null);
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('betforbes_user');
+    apiService.clearAuthData();
+    console.log('🧹 AuthContext: Todos os dados de autenticação foram limpos');
+  };
+
+  /** Inicialização: reidrata token, renova se preciso e valida no servidor */
   useEffect(() => {
     const initializeAuth = async () => {
+      console.log('🔄 AuthContext: Inicializando autenticação...');
+
+      // migração de chave antiga (se ainda existir)
+      const legacy = localStorage.getItem('token');
+      if (legacy && !localStorage.getItem('accessToken')) {
+        localStorage.setItem('accessToken', legacy);
+        localStorage.removeItem('token');
+      }
+
       const storedToken = localStorage.getItem('accessToken');
+      const savedUser = loadUserData();
+
+      console.log('AuthContext: savedUser:', savedUser);
+      console.log('AuthContext: storedToken:', storedToken ? 'presente' : 'ausente');
+
       if (!storedToken) {
-        apiService.clearAuthData();
+        console.log('🔴 AuthContext: Nenhum token encontrado');
+        clearAllAuthData();
         setIsLoading(false);
         return;
       }
 
+      // mostra user salvo enquanto valida, pra evitar flicker
+      if (savedUser) setUser(savedUser);
+
       setIsLoading(true);
       try {
         apiService.setAuthHeader(storedToken);
+
+        // 1) Se token local estiver expirado, tenta refresh
+        if (!apiService.hasValidToken()) {
+          console.log('🔄 AuthContext: Token expirado localmente, tentando refresh...');
+          const refreshResponse = await apiService.refreshToken(); // pode vir só tokens
+          const { accessToken: newAT, refreshToken: newRT } = extractTokens(refreshResponse);
+          if (!newAT) throw new Error('Falha ao renovar token');
+
+          localStorage.setItem('accessToken', newAT);
+          if (newRT) localStorage.setItem('refreshToken', newRT);
+          apiService.setAuthHeader(newAT);
+          console.log('✅ AuthContext: Token renovado localmente');
+        }
+
+        // 2) Valida no servidor (usa /api/auth/validate)
         const response = await apiService.validateToken();
-        if (response.success && response.data?.user) {
-          setUser(response.data.user);
-          console.log('✅ AuthContext: Token válido');
+        const serverUser = response?.data?.user ?? response?.user ?? null;
+
+        if (serverUser) {
+          saveUserData(serverUser);
+          console.log('✅ AuthContext: Token válido no servidor');
         } else {
-          setUser(null);
-          apiService.clearAuthData();
-          console.log('🔴 AuthContext: Token inválido');
+          console.log('🔴 AuthContext: Token inválido no servidor');
+          clearAllAuthData();
         }
       } catch (err) {
-        console.error('❌ AuthContext: Erro na validação do token', err);
-        setUser(null);
-        apiService.clearAuthData();
+        console.error('❌ AuthContext: Erro na validação/refresh', err);
+        clearAllAuthData();
       } finally {
         setIsLoading(false);
       }
     };
+
     initializeAuth();
   }, []);
 
+  /** Sync entre abas */
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'accessToken' && !e.newValue) {
+        console.log('🔄 AuthContext: Token removido em outra aba, fazendo logout');
+        clearAllAuthData();
+      } else if (e.key === 'betforbes_user' && e.newValue) {
+        try {
+          setUser(JSON.parse(e.newValue));
+          console.log('🔄 AuthContext: Dados do usuário atualizados de outra aba');
+        } catch (err) {
+          console.error('❌ AuthContext: Erro ao sincronizar dados do usuário', err);
+        }
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  /** LOGIN */
   const login = async (email: string, password: string): Promise<void> => {
     setIsLoading(true);
     setError(null);
@@ -81,24 +192,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const res = (await apiService.login({ email, password } as LoginRequest)) as AuthResponse;
       console.log('📦 AuthContext: Resposta do login:', res);
 
-      if (!res.success || !res.data?.tokens.accessToken) {
-        throw new Error(res.message || 'Falha no login');
-      }
+      const { accessToken, refreshToken } = extractTokens(res);
+      const u = extractUser(res);
+      if (!accessToken) throw new Error(res?.message || 'Falha no login');
 
-      // Persiste tokens e configura header
-      localStorage.setItem('accessToken', res.data.tokens.accessToken);
-      localStorage.setItem('refreshToken', res.data.tokens.refreshToken);
-      apiService.setAuthHeader(res.data.tokens.accessToken);
+      localStorage.setItem('accessToken', accessToken);
+      if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
+      apiService.setAuthHeader(accessToken);
 
-      setUser(res.data.user);
+      if (u) saveUserData(u);
       toast.success('🎉 Login realizado com sucesso!');
       console.log('✅ AuthContext: Login bem-sucedido');
     } catch (err: any) {
       console.error('❌ AuthContext: Erro no login:', err);
-      setUser(null);
-      const msg = err.response?.data?.message || err.message || 'Erro ao fazer login';
+      clearAllAuthData();
+      const msg = err?.response?.data?.message || err?.message || 'Erro ao fazer login';
       setError(msg);
-      apiService.clearAuthData();
       toast.error(msg);
       throw err;
     } finally {
@@ -106,6 +215,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  /** REGISTER */
   const register = async (name: string, email: string, password: string): Promise<void> => {
     setIsLoading(true);
     setError(null);
@@ -114,24 +224,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const res = (await apiService.register({ name, email, password } as RegisterRequest)) as AuthResponse;
       console.log('📦 AuthContext: Resposta do registro:', res);
 
-      if (!res.success || !res.data?.tokens.accessToken) {
-        throw new Error(res.message || 'Falha no registro');
-      }
+      const { accessToken, refreshToken } = extractTokens(res);
+      const u = extractUser(res);
+      if (!accessToken) throw new Error(res?.message || 'Falha no registro');
 
-      // Persiste tokens e configura header
-      localStorage.setItem('accessToken', res.data.tokens.accessToken);
-      localStorage.setItem('refreshToken', res.data.tokens.refreshToken);
-      apiService.setAuthHeader(res.data.tokens.accessToken);
+      localStorage.setItem('accessToken', accessToken);
+      if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
+      apiService.setAuthHeader(accessToken);
 
-      setUser(res.data.user);
+      if (u) saveUserData(u);
       toast.success('🎉 Registro realizado com sucesso!');
       console.log('✅ AuthContext: Registro bem-sucedido');
     } catch (err: any) {
       console.error('❌ AuthContext: Erro no registro:', err);
-      setUser(null);
-      const msg = err.response?.data?.message || err.message || 'Erro ao registrar';
+      clearAllAuthData();
+      const msg = err?.response?.data?.message || err?.message || 'Erro ao registrar';
       setError(msg);
-      apiService.clearAuthData();
       toast.error(msg);
       throw err;
     } finally {
@@ -139,15 +247,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  /** LOGOUT */
   const logout = async (): Promise<void> => {
     try {
       console.log('🔒 AuthContext: Logout iniciado');
-      await apiService.logout();
+      await apiService.logout().catch(() => {}); // best-effort
     } catch (err) {
       console.error('❌ AuthContext: Erro no logout', err);
     } finally {
-      setUser(null);
-      apiService.clearAuthData();
+      clearAllAuthData();
       toast.info('Você saiu da conta.');
     }
   };
