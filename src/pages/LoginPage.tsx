@@ -12,10 +12,12 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { Eye, EyeOff } from 'lucide-react';
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { login, user, isLoading } = useAuth();
   const navigate = useNavigate();
@@ -90,15 +92,24 @@ const LoginPage: React.FC = () => {
               <Label htmlFor="password" className="text-gray-300 text-lg font-medium">
                 Senha
               </Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="bg-[#3a3a3a] border-gray-600 text-white placeholder-gray-400 h-14 text-lg px-4"
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="bg-[#3a3a3a] border-gray-600 text-white placeholder-gray-400 h-14 text-lg px-4 pr-12"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+                >
+                  {showPassword ? <EyeOff size={24} /> : <Eye size={24} />}
+                </button>
+              </div>
             </div>
             <Button
               type="submit"

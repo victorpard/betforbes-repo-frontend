@@ -12,16 +12,44 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { Eye, EyeOff, Check, X } from 'lucide-react';
 
 const RegisterPage: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const { register, user, isLoading } = useAuth();
   const navigate = useNavigate();
+
+  // Função para verificar requisitos individuais da senha
+  const getPasswordRequirements = (pwd: string) => {
+    return {
+      minLength: pwd.length >= 8,
+      hasUppercase: /[A-Z]/.test(pwd),
+      hasLowercase: /[a-z]/.test(pwd),
+      hasNumber: /\d/.test(pwd),
+      hasSpecialChar: /[!@#$%^&*()_+{}\[\]:;"'<>,.?/~\\-]/.test(pwd)
+    };
+  };
+
+  // Função para calcular a força da senha (0-100)
+  const getPasswordStrength = (pwd: string) => {
+    const requirements = getPasswordRequirements(pwd);
+    const metRequirements = Object.values(requirements).filter(Boolean).length;
+    return (metRequirements / 5) * 100;
+  };
+
+  // Função para obter a cor da barra de força
+  const getStrengthColor = (strength: number) => {
+    if (strength < 40) return '#e74c3c'; // Vermelho
+    if (strength < 80) return '#f39c12'; // Laranja
+    return '#27ae60'; // Verde
+  };
 
   const validatePassword = (pwd: string) => {
     const regex =
@@ -119,27 +147,113 @@ const RegisterPage: React.FC = () => {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="password" className="text-gray-300">Senha</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="bg-[#3a3a3a] border-gray-600 text-white placeholder-gray-400 h-12"
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="bg-[#3a3a3a] border-gray-600 text-white placeholder-gray-400 h-12 pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+              
+              {/* Indicador de força da senha */}
+              {password && (
+                <div className="mt-2">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs text-gray-400">Força da senha:</span>
+                    <span className="text-xs" style={{ color: getStrengthColor(getPasswordStrength(password)) }}>
+                      {getPasswordStrength(password) < 40 ? 'Fraca' : 
+                       getPasswordStrength(password) < 80 ? 'Média' : 'Forte'}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-600 rounded-full h-2">
+                    <div
+                      className="h-2 rounded-full transition-all duration-300"
+                      style={{
+                        width: `${getPasswordStrength(password)}%`,
+                        backgroundColor: getStrengthColor(getPasswordStrength(password))
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Requisitos da senha */}
+              {password && (
+                <div className="mt-2 space-y-1">
+                  <p className="text-xs text-gray-400 mb-2">Requisitos da senha:</p>
+                  {Object.entries({
+                    minLength: 'Mínimo 8 caracteres',
+                    hasUppercase: '1 letra maiúscula',
+                    hasLowercase: '1 letra minúscula', 
+                    hasNumber: '1 número',
+                    hasSpecialChar: '1 caractere especial (!@#$%...)'
+                  }).map(([key, label]) => {
+                    const requirements = getPasswordRequirements(password);
+                    const isMet = requirements[key as keyof typeof requirements];
+                    return (
+                      <div key={key} className="flex items-center gap-2">
+                        {isMet ? (
+                          <Check size={14} className="text-green-400" />
+                        ) : (
+                          <X size={14} className="text-red-400" />
+                        )}
+                        <span className={`text-xs ${isMet ? 'text-green-400' : 'text-red-400'}`}>
+                          {label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="confirmPassword" className="text-gray-300">Confirmar Senha</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                placeholder="••••••••"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                className="bg-[#3a3a3a] border-gray-600 text-white placeholder-gray-400 h-12"
-              />
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  className="bg-[#3a3a3a] border-gray-600 text-white placeholder-gray-400 h-12 pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+                >
+                  {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+              
+              {/* Indicador de confirmação de senha */}
+              {confirmPassword && (
+                <div className="flex items-center gap-2 mt-1">
+                  {password === confirmPassword ? (
+                    <>
+                      <Check size={14} className="text-green-400" />
+                      <span className="text-xs text-green-400">Senhas coincidem</span>
+                    </>
+                  ) : (
+                    <>
+                      <X size={14} className="text-red-400" />
+                      <span className="text-xs text-red-400">Senhas não coincidem</span>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
             <Button
               type="submit"

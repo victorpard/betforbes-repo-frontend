@@ -1,5 +1,5 @@
 // API Service para integração com backend BetForbes
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 interface LoginRequest {
   email: string;
@@ -10,6 +10,7 @@ interface RegisterRequest {
   name: string;
   email: string;
   password: string;
+  confirmPassword: string;
 }
 
 interface AuthResponse {

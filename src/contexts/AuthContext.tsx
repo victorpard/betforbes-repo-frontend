@@ -221,7 +221,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setError(null);
     try {
       console.log('📝 AuthContext: Iniciando registro...');
-      const res = (await apiService.register({ name, email, password } as RegisterRequest)) as AuthResponse;
+      const res = (await apiService.register({ name, email, password, confirmPassword: password } as RegisterRequest)) as AuthResponse;
       console.log('📦 AuthContext: Resposta do registro:', res);
 
       const { accessToken, refreshToken } = extractTokens(res);

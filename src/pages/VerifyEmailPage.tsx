@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import { toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
 
 const VerifyEmailPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -10,39 +8,53 @@ const VerifyEmailPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = searchParams.get('token');
-    if (!token) {
+    const raw = searchParams.get('token');
+
+    if (!raw) {
       toast.error('Token de verificação inválido.');
       navigate('/login', { replace: true });
       return;
     }
 
-    const verifyEmail = async () => {
+    const token = raw.trim().replace(/[\r\n]/g, '');
+    const apiBase = import.meta.env.VITE_API_URL || '/api';
+
+    (async () => {
       try {
-        const { data } = await axios.get(`/api/auth/verify-email?token=${token}`);
-        if (data.success) {
-          toast.success('🎉 Email verificado com sucesso!');
+        const res = await fetch(`${apiBase}/auth/verify-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token }),
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (res.ok && data?.success) {
+          toast.success('E-mail verificado com sucesso! Faça login para continuar.');
         } else {
-          toast.error(data.message || 'Falha ao verificar email.');
+          // mensagens mais amigáveis por código, quando houver
+          const msg =
+            data?.code === 'TOKEN_ALREADY_USED'
+              ? 'Este link já foi utilizado. Faça login ou solicite um novo e-mail.'
+              : data?.code === 'TOKEN_EXPIRED'
+              ? 'Link expirado. Solicite um novo e-mail de verificação.'
+              : data?.message || 'Falha ao verificar e-mail.';
+          toast.error(msg);
         }
-      } catch (err: any) {
-        console.error('Erro ao verificar email:', err);
-        toast.error(err.response?.data?.message || 'Erro ao verificar email.');
+      } catch {
+        toast.error('Erro ao verificar e-mail. Tente novamente em instantes.');
       } finally {
         setLoading(false);
-        setTimeout(() => navigate('/login', { replace: true }), 2000);
+        setTimeout(() => navigate('/login', { replace: true }), 1800);
       }
-    };
-
-    verifyEmail();
+    })();
   }, [searchParams, navigate]);
 
   return (
     <div className="flex justify-center items-center min-h-screen bg-gray-900">
-      {loading
-        ? <p className="text-white text-lg">Verificando seu e-mail…</p>
-        : <p className="text-white text-lg">Redirecionando para o login…</p>
-      }
+      <p className="text-white text-lg">
+        {loading ? 'Verificando seu e-mail…' : 'Redirecionando para o login…'}
+      </p>
     </div>
   );
 };

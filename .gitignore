@@ -1,10 +1,11 @@
 node_modules/
 dist/
-coverage/
+.env
+.env.*
+*.log
 npm-debug.log*
 pnpm-lock.yaml
 yarn.lock
 .DS_Store
-.env
-.env.local
-.env.*.local
+*.save
+*.save.*
