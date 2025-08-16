@@ -1,3 +1,7 @@
+import "@/interceptors/referralCapture";
+import "@/interceptors/axiosAuthGlobal";
+import "@/interceptors/authToken";
+import '@/interceptors/referralInterceptor';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { RouterProvider } from 'react-router-dom';

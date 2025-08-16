@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
+import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,7 @@ import {
 } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Eye, EyeOff, Check, X } from 'lucide-react';
+import { saveReferral, getReferral } from '@/utils/referral';
 
 const RegisterPage: React.FC = () => {
   const [name, setName] = useState('');
@@ -25,6 +27,46 @@ const RegisterPage: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const { register, user, isLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Captura ?ref= na URL e persiste (não altera UI)
+  useEffect(() => {
+    const ref = new URLSearchParams(location.search).get('ref');
+    if (ref) saveReferral(ref);
+  }, [location.search]);
+
+  // Interceptor LOCAL: injeta referralCode no POST /auth/register
+  useEffect(() => {
+    const id = axios.interceptors.request.use((config) => {
+      try {
+        const method = (config.method || 'get').toLowerCase();
+        const url = String(config.url || '');
+        if (method === 'post' && /\/auth\/register(?:$|\?)/.test(url)) {
+          const ref = getReferral();
+          if (ref) {
+            const data: any = (config as any).data;
+            if (typeof FormData !== 'undefined' && data instanceof FormData) {
+              if (!data.has('referralCode')) data.set('referralCode', ref);
+            } else if (data && typeof data === 'object') {
+              if (!('referralCode' in data)) data.referralCode = ref;
+            } else if (typeof data === 'string') {
+              try {
+                const obj = JSON.parse(data);
+                if (!obj.referralCode) obj.referralCode = ref;
+                (config as any).data = obj; // axios serializa
+              } catch {
+                (config as any).data = { referralCode: ref };
+              }
+            } else {
+              (config as any).data = { referralCode: ref };
+            }
+          }
+        }
+      } catch {}
+      return config;
+    });
+    return () => axios.interceptors.request.eject(id);
+  }, []);
 
   // Função para verificar requisitos individuais da senha
   const getPasswordRequirements = (pwd: string) => {
@@ -81,6 +123,7 @@ const RegisterPage: React.FC = () => {
     }
 
     try {
+      // Mantém sua assinatura atual de register; confirmPassword é tratado no backend/contexto
       await register(name, email, password);
       setSuccessMessage(
         '✅ Cadastro efetuado com sucesso! Verifique seu e-mail para ativar a conta.'
@@ -165,14 +208,14 @@ const RegisterPage: React.FC = () => {
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
-              
+
               {/* Indicador de força da senha */}
               {password && (
                 <div className="mt-2">
                   <div className="flex justify-between items-center mb-1">
                     <span className="text-xs text-gray-400">Força da senha:</span>
                     <span className="text-xs" style={{ color: getStrengthColor(getPasswordStrength(password)) }}>
-                      {getPasswordStrength(password) < 40 ? 'Fraca' : 
+                      {getPasswordStrength(password) < 40 ? 'Fraca' :
                        getPasswordStrength(password) < 80 ? 'Média' : 'Forte'}
                     </span>
                   </div>
@@ -195,7 +238,7 @@ const RegisterPage: React.FC = () => {
                   {Object.entries({
                     minLength: 'Mínimo 8 caracteres',
                     hasUppercase: '1 letra maiúscula',
-                    hasLowercase: '1 letra minúscula', 
+                    hasLowercase: '1 letra minúscula',
                     hasNumber: '1 número',
                     hasSpecialChar: '1 caractere especial (!@#$%...)'
                   }).map(([key, label]) => {
@@ -237,7 +280,7 @@ const RegisterPage: React.FC = () => {
                   {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
-              
+
               {/* Indicador de confirmação de senha */}
               {confirmPassword && (
                 <div className="flex items-center gap-2 mt-1">

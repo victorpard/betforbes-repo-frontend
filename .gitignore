@@ -9,3 +9,7 @@ yarn.lock
 .DS_Store
 *.save
 *.save.*
+build/
+out/
+.next/
+coverage/
