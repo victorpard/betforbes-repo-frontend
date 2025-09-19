@@ -1,18 +1,32 @@
-# dependências e builds
 node_modules/
 dist/
-coverage/
-
-# configs/segredos
+build/
+.vite/
 .env
-
-# artefatos locais
+.env.*
 *.log
-npm-debug.log*
-pnpm-lock.yaml
-yarn.lock
 .DS_Store
-bfg.jar
+.idea/
+.vscode/
+# lixo/local
+.nvm/
+.pm2/
+.cache/
+.snap/
+.trash_*/
+backups*/
+backups-nginx/
+nginx-backup/
+nginx-disabled_*/
+bf-backups/
+rollback*/
+forensics*/
+k6/
+*.tgz
+*.tar.gz
+*.zip
+*.apk
+*.jwt
+
+# evita repos dentro do repo
 repo.git/
-repo-clean.git/
-logs/
