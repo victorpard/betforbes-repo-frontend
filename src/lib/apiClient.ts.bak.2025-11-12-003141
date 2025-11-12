@@ -1,0 +1,19 @@
+// Cliente Axios padrão do frontend
+import axios, { AxiosInstance } from 'axios';
+
+export const api: AxiosInstance = axios.create({
+  baseURL: '/api',
+  withCredentials: true,
+  timeout: 20000,
+});
+
+// Reaplica Authorization do localStorage (caso exista)
+try {
+  const t = localStorage.getItem('accessToken');
+  if (t) {
+    api.defaults.headers.common['Authorization'] = `Bearer ${t}`;
+    axios.defaults.headers.common['Authorization'] = `Bearer ${t}`; // cobre imports que usam axios direto
+  }
+} catch { /* noop */ }
+
+export default api;

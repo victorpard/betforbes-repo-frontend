@@ -1,0 +1,54 @@
+import { useCallback, useEffect, useState } from 'react';
+import { api } from '@/lib/apiClient';
+
+export interface AffiliateStats {
+  totalReferrals?: number;
+  activeReferrals?: number;
+  totalEarnings?: number;
+  periodEarnings?: number;
+  [k: string]: any;
+}
+
+type Referral = any;
+
+export function useAffiliateStats() {
+  const [stats, setStats] = useState<AffiliateStats | null>(null);
+  const [referrals, setReferrals] = useState<Referral[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    // >>> Força Authorization nessas chamadas específicas
+    const t = localStorage.getItem('accessToken');
+    const authCfg = t ? { headers: { Authorization: `Bearer ${t}` } } : {};
+
+    try {
+      const [rStats, rRefs] = await Promise.all([
+        api.get('/affiliate/stats', authCfg),
+        api.get('/affiliate/referrals', { ...authCfg, params: { page: 1, limit: 50 } }),
+      ]);
+
+      const ok1 = (rStats.status >= 200 && rStats.status < 300);
+      const ok2 = (rRefs.status >= 200 && rRefs.status < 300);
+      if (!ok1 || !ok2) {
+        throw new Error(rStats.data?.message || rRefs.data?.message || 'Falha ao carregar afiliados');
+      }
+
+      setStats(rStats.data?.data ?? rStats.data ?? null);
+      setReferrals(rRefs.data?.data ?? rRefs.data ?? []);
+    } catch (err: any) {
+      setError(err?.message || 'Erro ao carregar dados de afiliados');
+      setStats(null);
+      setReferrals([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  return { stats, referrals, loading, error, reload: load };
+}

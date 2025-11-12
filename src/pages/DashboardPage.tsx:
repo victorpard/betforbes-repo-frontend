@@ -1,0 +1,164 @@
+// src/pages/DashboardPage.tsx
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+
+interface Order {
+  id: string;
+  asset: string;
+  amount: number;
+  leverage: number;
+  status: 'OPEN' | 'CLOSED';
+  profitLoss?: number;
+}
+
+interface BetsResponse {
+  orders: Order[];
+  balance: number;
+}
+
+interface ProfileUser {
+  id: string;
+  name: string;
+  email: string;
+  role?: string;
+  isVerified?: boolean;
+  referralCode?: string | null;
+  affiliateLink?: string | null;
+}
+
+interface ProfileResponse {
+  success: boolean;
+  user?: ProfileUser;
+  data?: { user?: ProfileUser };
+}
+
+const API = import.meta.env.VITE_API_URL; // usado no /bets
+const BASE = API || '/api';               // fallback para rotas /api/* do backend
+
+const DashboardPage: React.FC = () => {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [balance, setBalance] = useState<number>(0);
+
+  const [loadingProfile, setLoadingProfile] = useState<boolean>(true);
+  const [referralCode, setReferralCode] = useState<string | null>(null);
+  const [affiliateLink, setAffiliateLink] = useState<string | null>(null);
+
+  // === 1) Buscar dados de apostas (o que você já tinha) ===
+  useEffect(() => {
+    const fetchBets = async () => {
+      const token = localStorage.getItem('accessToken');
+      const res = await axios.get<BetsResponse>(`${API}/bets`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        withCredentials: true,
+      });
+      setOrders(res.data.orders);
+      setBalance(res.data.balance);
+    };
+    fetchBets().catch(console.error);
+  }, []);
+
+  // === 2) Buscar perfil para obter referralCode / affiliateLink ===
+  useEffect(() => {
+    const fetchProfile = async () => {
+      setLoadingProfile(true);
+      try {
+        const token = localStorage.getItem('accessToken');
+        const res = await axios.get<ProfileResponse>(`${BASE}/users/profile`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          withCredentials: true,
+        });
+
+        const u: ProfileUser | undefined =
+          res.data.user ?? res.data.data?.user ?? undefined;
+
+        const code = u?.referralCode ?? null;
+        const link =
+          u?.affiliateLink ??
+          (code
+            ? `${(window.location.origin || '').toString().replace(/\/$/, '')}/r/${code}`
+            : null);
+
+        setReferralCode(code);
+        setAffiliateLink(link);
+      } catch (err) {
+        console.error('Falha ao obter perfil:', err);
+        setReferralCode(null);
+        setAffiliateLink(null);
+      } finally {
+        setLoadingProfile(false);
+      }
+    };
+
+    fetchProfile();
+  }, []);
+
+  return (
+    <div className="p-4">
+      <h1 className="text-2xl font-bold">Dashboard</h1>
+      <p className="mt-2 text-lg">Saldo Fictício: {balance.toFixed(2)} USDT</p>
+
+      {/* === Bloco: Link de Afiliado === */}
+      <div className="mt-4 max-w-3xl rounded-xl border border-[#2a2a2a] bg-[#141414] p-4 text-[#ddd]">
+        <div className="mb-2 text-sm opacity-85">Seu link de afiliado</div>
+
+        {loadingProfile && <div className="text-[#aaa]">Carregando perfil…</div>}
+
+        {!loadingProfile && !affiliateLink && (
+          <div className="text-[#f5c542]">
+            Seu perfil ainda não trouxe um link/código de afiliado.
+          </div>
+        )}
+
+        {affiliateLink && (
+          <>
+            <div className="flex items-center gap-2">
+              <input
+                readOnly
+                value={affiliateLink}
+                className="flex-1 rounded-lg border border-[#2a2a2a] bg-[#0b0b0b] px-3 py-2 text-[#f2f2f2]"
+              />
+              <button
+                onClick={() => navigator.clipboard.writeText(affiliateLink)}
+                className="cursor-pointer rounded-xl border border-[rgba(255,215,0,0.4)] px-3 py-2 text-[#ffd700] hover:opacity-90"
+              >
+                Copiar
+              </button>
+            </div>
+            {referralCode && (
+              <div className="mt-2 text-xs text-[#aaa]">
+                Código:{' '}
+                <span className="font-mono">{referralCode}</span>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* === Tabela de Orders (mantida) === */}
+      <table className="mt-4 w-full">
+        <thead>
+          <tr>
+            <th>Ativo</th>
+            <th>Qtd</th>
+            <th>Lev.</th>
+            <th>Status</th>
+            <th>P/L</th>
+          </tr>
+        </thead>
+        <tbody>
+          {orders.map((o) => (
+            <tr key={o.id}>
+              <td>{o.asset}</td>
+              <td>{o.amount}</td>
+              <td>{o.leverage}×</td>
+              <td>{o.status}</td>
+              <td>{o.profitLoss?.toFixed(2) ?? '-'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+export default DashboardPage;
